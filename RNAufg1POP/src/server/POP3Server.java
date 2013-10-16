@@ -2,6 +2,8 @@ package server;
 
 public class POP3Server {
 	
+	
+	
 	public void computeCommand(String msg){
 		String cmd = msg.toUpperCase().substring(0, 3);
 		switch(cmd){
