@@ -42,7 +42,7 @@ public class POP3Server extends Thread {
 				connectionSocket = welcomeSocket.accept();
 
 				/* Neuen Arbeits-Thread erzeugen und den Socket übergeben */
-				(new TCPServerThread(++counter, connectionSocket)).start();
+				(new POP3ServerThread(++counter, connectionSocket)).start();
 			}
 		} catch (IOException e) {
 			sTrace.error(e.toString());
@@ -50,7 +50,7 @@ public class POP3Server extends Thread {
 	}
 }
 
-class TCPServerThread extends Thread {
+class POP3ServerThread extends Thread {
 	/*
 	 * Arbeitsthread, der eine existierende Socket-Verbindung zur Bearbeitung
 	 * erhält
@@ -65,7 +65,7 @@ class TCPServerThread extends Thread {
 
 	boolean serviceRequested = true; // Arbeitsthread beenden?
 
-	public TCPServerThread(int num, Socket sock) {
+	public POP3ServerThread(int num, Socket sock) {
 		/* Konstruktor */
 		this.name = num;
 		this.socket = sock;
