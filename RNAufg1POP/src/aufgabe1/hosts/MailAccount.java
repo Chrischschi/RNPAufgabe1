@@ -1,7 +1,6 @@
 package aufgabe1.hosts;
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 
 import aufgabe1.Proxy;
 
