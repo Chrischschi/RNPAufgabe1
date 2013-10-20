@@ -17,6 +17,17 @@ import java.util.List;
  *
  */
 public class MailFileOps {
+	
+	public static final Path MAIL_STORAGE_PATH = Paths.get("mail_storage/"); //Ordner wo die dateien gespeichert werden
+	/**
+	 * Der zeichensatz, der zum lesen und abspeichern verwendet wird,
+	 *  laut rfc 5321 (SMTP) http://tools.ietf.org/html/rfc5321 soll 
+	 *  dies US-ASCII (7-bit) sein, jedoch macht das große probleme 
+	 *  mit umlauten. Daher: US-ASCII oder doch lieber Charset.defaultCharset() ? 
+	 */
+	public static final Charset USED_CHAR_SET =  Charset.forName("US-ASCII");
+	
+	
 	/** 
 	 * Spezifikation im original von Steffen Windrath:
 	 * 
@@ -25,10 +36,14 @@ public class MailFileOps {
 	 * ok dann brauch ich ne methode, um ne List<String> mit String x als namen der datei abzuspeichern,
 	 * returns: Den Pfad der datei auf dem Dateisystem
 	 * */
-	public static Path saveMail(List<String> message,String filename) throws IOException {
-		Path whereItsStored = Paths.get("mail_storage", filename).toAbsolutePath();
-		Path whereItGotStored = Files.createFile(whereItsStored);
-		return Files.write(whereItGotStored, message,Charset.defaultCharset() );
+	public static Path saveMail(List<String> message, String filename) throws IOException {
+		if (Files.notExists(MAIL_STORAGE_PATH)) {
+			Files.createDirectory(MAIL_STORAGE_PATH); //den ordner erzeugen, wo die mails gespeichert werden
+		}
+		Path whereItsStored = Paths.get("mail_storage/" + filename + ".txt"); //dateinamen zusammenbauen
+		Files.deleteIfExists(whereItsStored); //vorherige mail die den gleichen namen hatte, löschen
+		whereItsStored = Files.createFile(whereItsStored); //datei erzeugen
+		return Files.write(whereItsStored, message, USED_CHAR_SET); //Nachricht in die datei schreiben
 	}
 	
 	/**
