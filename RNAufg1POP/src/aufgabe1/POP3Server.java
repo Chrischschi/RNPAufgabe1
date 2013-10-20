@@ -1,50 +1,123 @@
 package aufgabe1;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import de.huebner.Proxy;
+import de.wendholt.utility.SystemTrace;
+import de.wendholt.utility.Trace;
 
-public class POP3Server {
+
+public class POP3Server extends Thread {
 	
 	public static final int POP3_TEST_PORT_NUMBER = 11000;  
 	
-	public ServerSocket welcomeSocket;
+	public ServerSocket welcomeSocket; // TCP-Server-Socketklasse
 	
-	public Socket connectionSocket;
+	public Socket connectionSocket; // TCP-Standard-Socketklasse
 	
 	public POP3Server(){
 		
+		Trace sTrace = new SystemTrace();
+		sTrace.setDebug(Proxy.DEBUG);
+		
+		int counter = 0; // Z‰hlt die erzeugten Bearbeitungs-Threads
+
 		try {
+			/* Server-Socket erzeugen */
 			welcomeSocket = new ServerSocket(POP3_TEST_PORT_NUMBER);
+
+			while (true) { // Server laufen IMMER
+				sTrace.debug("TCP Server: Waiting for connection - listening TCP port "
+								+ POP3_TEST_PORT_NUMBER);
+				/*
+				 * Blockiert auf Verbindungsanfrage warten --> nach
+				 * Verbindungsaufbau Standard-Socket erzeugen und
+				 * connectionSocket zuweisen
+				 */
+				connectionSocket = welcomeSocket.accept();
+
+				/* Neuen Arbeits-Thread erzeugen und den Socket ¸bergeben */
+				(new TCPServerThread(++counter, connectionSocket)).start();
+			}
 		} catch (IOException e) {
-			e.printStackTrace(System.err);
+			sTrace.error(e.toString());
+		}
+	}
+}
+
+class TCPServerThread extends Thread {
+	/*
+	 * Arbeitsthread, der eine existierende Socket-Verbindung zur Bearbeitung
+	 * erh‰lt
+	 */
+	private int name;
+	private Socket socket;
+	
+	Trace sTrace = new SystemTrace();
+
+	private BufferedReader inFromClient;
+	private DataOutputStream outToClient;
+
+	boolean serviceRequested = true; // Arbeitsthread beenden?
+
+	public TCPServerThread(int num, Socket sock) {
+		/* Konstruktor */
+		this.name = num;
+		this.socket = sock;
+	}
+
+	public void run() {
+		String capitalizedSentence;
+
+		sTrace.debug("TCP Server Thread " + name
+				+ " is running until QUIT is received!");
+
+		try {
+			/* Socket-Basisstreams durch spezielle Streams filtern */
+			inFromClient = new BufferedReader(new InputStreamReader(
+					socket.getInputStream()));
+			outToClient = new DataOutputStream(socket.getOutputStream());
+
+			while (serviceRequested) {
+				/* String vom Client empfangen und in Groﬂbuchstaben umwandeln */
+				capitalizedSentence = readFromClient().toUpperCase();
+
+				/* Modifizierten String an Client senden */
+				writeToClient(capitalizedSentence);
+
+				/* Test, ob Arbeitsthread beendet werden soll */
+				if (capitalizedSentence.indexOf("QUIT") > -1) {
+					serviceRequested = false;
+				}
+			}
+
+			/* Socket-Streams schlieﬂen --> Verbindungsabbau */
+			socket.close();
+		} catch (IOException e) {
+			sTrace.error("Connection aborted by client!");
 		}
 
+		sTrace.debug("TCP Server Thread " + name + " stopped!");
 	}
-	
-	
-	public void listenForRequests() {
-		
-		
-		
+
+	private String readFromClient() throws IOException {
+		/* Lies die n‰chste Anfrage-Zeile (request) vom Client */
+		String request = inFromClient.readLine();
+		System.out.println("TCP Server Thread detected job: " + request);
+		return request;
 	}
-	
-	public static void main(String[] args) {
-		POP3Server server = new POP3Server(); 
-		try {
-			server.connectionSocket = server.welcomeSocket.accept(); //dem server auf seinen "gespr√§chspartner" warten lassen
-		} catch (IOException e) {
-			e.printStackTrace(System.err);
-		}
-		
-		
-		
-		
-		
+
+	private void writeToClient(String reply) throws IOException {
+		/* Sende den String als Antwortzeile (mit newline) zum Client */
+		outToClient.writeBytes(reply + '\n');
+		System.out.println("TCP Server Thread " + name
+				+ " has written the message: " + reply);
 	}
-	
-	
 	
 	public void computeCommand(String msg){
 		String cmd = msg.toUpperCase().substring(0, 3);

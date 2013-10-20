@@ -15,59 +15,50 @@ import de.wendholt.utility.Trace;
 
 public class Pop3Client {
 
-	//public static final int SERVER_PORT =  6789; //der client verbindet nicht zu diesem PORT, sondern zu den konfigurierten
-	
 	private Socket clientSocket; // TCP-Standard-Socketklasse
 
 	private DataOutputStream outToServer; // Ausgabestream zum Server
 	private BufferedReader inFromServer; // Eingabestream vom Server
-	
-	Trace sTrace = new SystemTrace();
 
+	private Trace sTrace = new SystemTrace();
 
-	public Pop3Client(){
+	boolean error;
+
+	public Pop3Client() {
 		sTrace.setDebug(Proxy.DEBUG);
 	}
-	
+
 	public void getMails(MailAccount account) {
-		/* Client starten. Ende, wenn quit eingegeben wurde */
 		List<String> mailContent;
-		
+
 		int numberOfMails;
-		
+		error = false;
 
 		/* Ab Java 7: try-with-resources mit automat. close benutzen! */
-		try {
-			//Socket, inklusive Streams, einrichten
-			openSocket(account);
-			
-			login(account);
-			
-			numberOfMails = getNumberOfMails();
-			
-			for (int i=1; i<=numberOfMails; i++){
-				mailContent = getMail(i);
-				saveMailContent(mailContent, Proxy.MAIL_DIRECTORY+"\\"+System.currentTimeMillis());
-			}
-			
-//			while (serviceRequested) {
-//				sTrace.debug("ENTER TCP-DATA: ");
-//				/* String vom Benutzer (Konsoleneingabe) holen */
-//				command = inFromUser.nextLine();
-//
-//				/* String an den Server senden */
-//				writeToServer(command);
-//
-//				/* Modifizierten String vom Server empfangen */
-//				singleLineResponse = readFromServer();
-//
-//				/* Test, ob Client beendet werden soll */
-//				if (singleLineResponse.indexOf("QUIT") > -1) {
-//					serviceRequested = false;
-//				}
-//			}
 
-			/* Socket-Streams schließen --> Verbindungsabbau */
+		// Socket, inklusive Streams, einrichten
+		openSocket(account);
+
+		if (!error) {
+
+			login(account);
+
+			if (!error) {
+
+				numberOfMails = getNumberOfMails();
+
+				for (int i = 1; !error && i <= numberOfMails; i++) {
+					mailContent = getMail(i);
+					if(!error){
+					saveMailContent(mailContent, Proxy.MAIL_DIRECTORY + "\\"
+							+ System.currentTimeMillis());
+					}
+				}
+			}
+		}
+		/* Socket-Streams schließen --> Verbindungsabbau */
+		try {
+			error = true;
 			clientSocket.close();
 		} catch (IOException e) {
 			sTrace.error("Connection aborted by server!");
@@ -75,8 +66,8 @@ public class Pop3Client {
 
 		sTrace.debug("TCP Client stopped!");
 	}
-	
-	private void openSocket(MailAccount account){
+
+	private void openSocket(MailAccount account) {
 		try {
 			/* Socket erzeugen --> Verbindungsaufbau mit dem Server */
 			clientSocket = new Socket(account.serverAddress, account.portNo);
@@ -84,65 +75,101 @@ public class Pop3Client {
 			outToServer = new DataOutputStream(clientSocket.getOutputStream());
 			inFromServer = new BufferedReader(new InputStreamReader(
 					clientSocket.getInputStream()));
-			
-			// "+OK [Server begrüßung]" abfangen
-			readFromServer();
+
+			if (readFromServer().startsWith("-ERR")) {
+				throw new Exception("Server returned Error");
+			}
+
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			error = true;
+			sTrace.error("Could not recieve Socket Streams");
 			e.printStackTrace();
+		} catch (Exception e) {
+			error = true;
+			sTrace.error("Could not connect to Server: "
+					+ account.serverAddress.getHostName() + "\n"
+					+ e.getMessage());
 		}
 	}
-	
-	private void login(MailAccount account){
-		//TODO -ERR Response & exception behandeln 
+
+	private void login(MailAccount account) {
 		try {
+			// send username
 			writeToServer("USER " + account.userName);
-			readFromServer();
+
+			if (readFromServer().startsWith("-ERR")) {
+				// Server returned -ERR -> abort
+				throw new Exception("Username refused");
+			}
+			// send password
 			writeToServer("PASS " + account.passwd);
-			readFromServer();
+
+			if (readFromServer().startsWith("-ERR")) {
+				// Server returned -ERR -> abort
+				throw new Exception("Password refused");
+			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			error = true;
+			sTrace.error("Socket Error during Pop3Client.login()\n" + e.getMessage());
+		} catch (Exception e) {
+			error = true;
+			sTrace.error("Could not login: "
+					+ account.serverAddress.getHostName() + " : "
+					+ account.userName + "\n" + e.getMessage());
 		}
 	}
-	
-	private int getNumberOfMails(){
+
+	private int getNumberOfMails() {
 		int n = 0;
 		String response;
 		try {
 			writeToServer("STAT");
 			response = readFromServer();
+			if (response.startsWith("-ERR")) {
+				// Server returned -ERR -> abort
+				throw new Exception("Server returned -ERR on \"STAT\" command");
+			}
 			n = Integer.parseInt(response.split(" ")[1]);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			error = true;
+			sTrace.error("Socket Error during Pop3Client.getNumberofMails()\n" + e.getMessage());
+		} catch (Exception e) {
+			error = true;
+			sTrace.error(e.getMessage());
 		}
 		return n;
 	}
-	
-	private List<String> getMail(int n){
+
+	private List<String> getMail(int n) {
 		List<String> mailContent = new ArrayList<String>();
 		String response = "";
 		try {
 			writeToServer("RETR " + n);
 			boolean noFullstop = true;
-			do{
-				response = readFromServer();
-				if(response.equals(".")){
-					noFullstop = false;
-				}else{
-					mailContent.add(response);
-				}
-			}while(noFullstop);
+			if (response.startsWith("-ERR")) {
+				
+			} else {
+				do {
+					response = readFromServer();
+					if (response.equals(".")) {
+						noFullstop = false;
+					} else {
+						if (response.startsWith("..")) {
+							response = response.substring(1);
+						}
+						mailContent.add(response);
+					}
+				} while (noFullstop);
+			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			error = true;
+			sTrace.error("Socket Error during Pop3Client.getMail()\n" + e.getMessage());
 		}
 		return mailContent;
 	}
-	
-	private void saveMailContent(List<String> mailContent, String file){
-		//TODO Dateien Speichern
+
+	private void saveMailContent(List<String> mailContent, String file) {
+		// TODO Dateien Speichern
 	}
 
 	private void writeToServer(String request) throws IOException {
