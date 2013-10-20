@@ -1,6 +1,6 @@
 package aufgabe1;
 
 public enum POP3State {
-	//Server stats
+	//Die Zustaende des Servers
 	Authorization, Transaction, Update;
 }
