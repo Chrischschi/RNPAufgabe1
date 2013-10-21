@@ -1,0 +1,12 @@
++OK 418 octets - message follows
+Message-ID: <52652E71.2000200@lab31.cpt.haw-hamburg.de>
+Date: Mon, 21 Oct 2013 15:38:57 +0200
+From: bai4rnpE <bai4rnpE@lab31.cpt.haw-hamburg.de>
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:17.0) Gecko/20130215 Thunderbird/17.0.3
+MIME-Version: 1.0
+To: bai4rnpE@lab30.cpt-haw-hamburg.de
+Subject: from lab 31 to lab 30
+Content-Type: text/plain; charset=ISO-8859-1; format=flowed
+Content-Transfer-Encoding: 7bit
+
+bTest
