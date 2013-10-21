@@ -50,7 +50,7 @@ public class MailFileOps {
 	 * ne methode, um den namen einer datei nr n zu bekommen,
 	 */
 	
-	public static Path findMailByIndex(int fileNumber) {
+	public static Path findMailByName(String fileName) {
 		throw new UnsupportedOperationException("Not implemented Yet.");
 	}
 	/**
@@ -58,8 +58,8 @@ public class MailFileOps {
  	returns: Eine Liste von strings mit dem inhalt der mail, zeilenweise.
  	*/
 	
-	public static List<String> loadMail(int fileNumber) {
-		throw new UnsupportedOperationException("Not implemented Yet.");
+	public static List<String> loadMail(String fileName) throws IOException {
+		return Files.readAllLines(MAIL_STORAGE_PATH.resolve(fileName + ".txt"), USED_CHAR_SET);
 	}
 	
 
