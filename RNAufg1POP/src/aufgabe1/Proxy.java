@@ -26,23 +26,26 @@ public class Proxy {
 	
 	private Pop3Client client = new Pop3Client();
 	
+	//Timer zum Starten des Client Threads
 	Timer timer = new Timer();
 	
+	//Trace zum erstellen eines Logs
 	private Trace sTrace = new SystemTrace();
 	
+	//Liste der Accounts von denen Mails geholt werden sollen
 	List<MailAccount> externAccounts = new ArrayList<MailAccount>();
 	
 	public Proxy(){
 		sTrace.setDebug(DEBUG);
 		String hostName = "lab30.cpt.haw-hamburg.de";
 		InetAddress address;
-	try {
+		try {
 			address = InetAddress.getByName(hostName);
 			externAccounts.add(new MailAccount("bai4rnpE", "FpHBfTgM", address, 11000));
 		} catch (UnknownHostException e) {
 			sTrace.error("Unknown Host: " + hostName);
 		}
-	hostName = "lab31.cpt.haw-hamburg.de";
+		hostName = "lab31.cpt.haw-hamburg.de";
 		try {
 			address = InetAddress.getByName(hostName);
 			externAccounts.add(new MailAccount("bai4rnpE", "FpHBfTgM", address, 11000));

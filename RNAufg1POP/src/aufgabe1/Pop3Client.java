@@ -37,7 +37,7 @@ public class Pop3Client {
 	public void getMails(MailAccount account) {
 		List<String> mailContent;
 		sTrace.debug("getting Mails");
-		int numberOfMails;
+		List<Integer> mailNumberList = new ArrayList<Integer>();
 		error = false;
 
 		/* Ab Java 7: try-with-resources mit automat. close benutzen! */
@@ -50,11 +50,11 @@ public class Pop3Client {
 			login(account);
 
 			if (!error) {
+				
+				mailNumberList = getMailNumberList();
 
-				numberOfMails = getNumberOfMails();
-
-				for (int i = 1; !error && i <= numberOfMails; i++) {
-					mailContent = getMail(i);
+				for (int i = 0; !error && i < mailNumberList.size(); i++) {
+					mailContent = getMail(mailNumberList.get(i));
 					if (!error) {
 						try {
 							String fileName = Long.toString(System
@@ -68,7 +68,18 @@ public class Pop3Client {
 							sTrace.debug("Mail konnte nicht gespeichert werden");
 						}
 					}
-					deleteMail(i);
+					deleteMail(mailNumberList.get(i));
+					
+				}
+				//QUIT Senden
+				try {
+					sTrace.debug("Try Quit Command");
+					writeToServer("QUIT");
+					if(!readFromServer().startsWith("+OK")){
+						sTrace.error("Quit Command failure");
+					}
+				} catch (IOException e) {
+					sTrace.error("Connection aborted by server!");
 				}
 			}
 		}
@@ -149,19 +160,27 @@ public class Pop3Client {
 		}
 	}
 
-	private int getNumberOfMails() {
-		int n = 0;
+	private List<Integer> getMailNumberList() {
 		String response;
+		List<String> responseList = new ArrayList<String>();
+		List<Integer> MailNumberList = new ArrayList<Integer>();
 		try {
 			sTrace.debug("Try Stat Command");
-			writeToServer("STAT");
+			writeToServer("List");
 			response = readFromServer();
+			while(!response.equals(".")){
+				responseList.add(response);
+				response = readFromServer();
+			}
 			if (response.startsWith("-ERR")) {
 				// Server returned -ERR -> abort
 				throw new Exception("Server returned -ERR on \"STAT\" command");
 			}
-			n = Integer.parseInt(response.split(" ")[1]);
-			sTrace.debug("Number of Mails: " + n);
+			for(int i = 1; i<responseList.size(); i++){
+				int Number = Integer.parseInt(responseList.get(i).split(" ")[0]);
+				MailNumberList.add(Number);
+				sTrace.debug("MailNumber: " + Number);
+			}
 		} catch (IOException e) {
 			error = true;
 			sTrace.error("Socket Error during Pop3Client.getNumberofMails()\n"
@@ -170,7 +189,7 @@ public class Pop3Client {
 			error = true;
 			sTrace.error(e.getMessage());
 		}
-		return n;
+		return MailNumberList;
 	}
 
 	private void deleteMail(int n) {
@@ -232,7 +251,7 @@ public class Pop3Client {
 															// mails gespeichert
 															// werden
 		}
-		Path whereItsStored = Paths.get("mail_storage/" + fileName + ".txt"); // dateinamen
+		Path whereItsStored = Paths.get(Proxy.MAIL_STORAGE_PATH + "/" + fileName + ".txt"); // dateinamen
 																				// zusammenbauen
 		Files.deleteIfExists(whereItsStored); // vorherige mail die den gleichen
 												// namen hatte, l�schen
@@ -245,7 +264,7 @@ public class Pop3Client {
 
 	private void writeToServer(String request) throws IOException {
 		/* Sende eine Zeile zum Server */
-		outToServer.writeBytes(request + '\n');
+		outToServer.writeBytes(request + "\r\n");
 		sTrace.debug("TCP Client has sent the message: " + request);
 	}
 

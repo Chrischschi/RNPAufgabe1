@@ -1,0 +1,17 @@
++OK 410 octets - message follows
+Message-ID: <5280E7A0.6020607@lab30.cpt.haw-hamburg.de>
+Date: Mon, 11 Nov 2013 15:20:16 +0100
+From: bai4rnpE <bai4rnpE@lab30.cpt.haw-hamburg.de>
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:17.0) Gecko/20130215 Thunderbird/17.0.3
+MIME-Version: 1.0
+To: bai4rnpE@lab31.cpt-haw-hamburg.de
+Subject: test
+Content-Type: text/plain; charset=ISO-8859-1; format=flowed
+Content-Transfer-Encoding: 7bit
+
+abc
+.
+..
+...
+
+

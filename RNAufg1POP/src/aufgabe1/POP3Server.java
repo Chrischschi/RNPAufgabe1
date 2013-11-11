@@ -17,6 +17,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.Set;
 
 import de.wendholt.utility.SystemTrace;
@@ -30,12 +33,16 @@ import de.wendholt.utility.Trace;
  * 
  */
 public class POP3Server extends Thread {
+	
+	public static final int MAX_THREADS = 20;
 
 	public static final int POP3_TEST_PORT_NUMBER = 11000;
 
 	public ServerSocket welcomeSocket; // TCP-Server-Socketklasse
 
 	public Socket connectionSocket; // TCP-Standard-Socketklasse
+	
+	private ExecutorService threadPool = Executors.newFixedThreadPool(MAX_THREADS);
 	
 	Trace sTrace;
 
@@ -61,8 +68,8 @@ public class POP3Server extends Thread {
 				connectionSocket = welcomeSocket.accept();
 
 				/* Neuen Arbeits-Thread erzeugen und den Socket �bergeben */
-				(new POP3ServerThread(++counter, connectionSocket,
-						internAccounts)).start();
+				threadPool.execute(new POP3ServerThread(++counter, connectionSocket,
+						internAccounts));
 			}
 		} catch (IOException e) {
 			sTrace.error(e.toString());
@@ -70,7 +77,7 @@ public class POP3Server extends Thread {
 	}
 }
 
-class POP3ServerThread extends Thread {
+class POP3ServerThread implements Runnable {
 	/*
 	 * Arbeitsthread, der eine existierende Socket-Verbindung zur Bearbeitung
 	 * erh�lt
@@ -95,6 +102,8 @@ class POP3ServerThread extends Thread {
 	private Integer mailCounter = 0;
 
 	private Set<Integer> deletedMails = new HashSet<Integer>();
+	
+	private final static boolean deleteOnException = true;
 
 	public POP3ServerThread(int num, Socket sock, Map<String, String> accounts) {
 		/* Konstruktor */
@@ -130,24 +139,12 @@ class POP3ServerThread extends Thread {
 				}
 			}
 			// L�schen der Mails nach erreichen des Update Status
-			for (Integer n : deletedMails) {
-				// Hole den Namen der Datei
-				String fileName = mails.get(n);
-				// Namens String in File Objekt, das auf die Datei im Mail
-				// Ordner
-				// referenziert, umwandeln
-				File mailFile = Paths.get(
-						Proxy.MAIL_STORAGE_PATH + fileName + ".txt").toFile();
-				// Versucht die Mail zu l�schen
-				sTrace.debug("loesche Datei " + fileName);
-				if (!mailFile.delete()) {
-					mailFile.deleteOnExit();
-				}
-			}
+			deleteMails();
 
 			/* Socket-Streams schlie�en --> Verbindungsabbau */
 			socket.close();
 		} catch (IOException e) {
+			deleteMailsOnException();
 			sTrace.error("Connection aborted by client!");
 		} catch (IllegalStateException e) {
 			sTrace.error("");
@@ -261,6 +258,7 @@ class POP3ServerThread extends Thread {
 				try {
 					writeToClient("-ERR no such message");
 				} catch (IOException e) {
+					deleteMailsOnException();
 					sTrace.error("Connection aborted by client! Thread" + name);
 				}
 			} else {
@@ -303,6 +301,7 @@ class POP3ServerThread extends Thread {
 		try {
 			writeToClient("+OK Delete Flags removed");
 		} catch (IOException e) {
+			deleteMailsOnException();
 			sTrace.error("Connection aborted by client! Thread" + name);
 		}
 
@@ -320,6 +319,7 @@ class POP3ServerThread extends Thread {
 					try {
 						writeToClient("+OK message " + n + " deleted");
 					} catch (IOException e) {
+						deleteMailsOnException();
 						sTrace.error("Connection aborted by client! Thread"
 								+ name);
 					}
@@ -328,6 +328,7 @@ class POP3ServerThread extends Thread {
 					try {
 						writeToClient("-ERR message " + n + " already deleted");
 					} catch (IOException e) {
+						deleteMailsOnException();
 						sTrace.error("Connection aborted by client! Thread"
 								+ name);
 					}
@@ -337,6 +338,7 @@ class POP3ServerThread extends Thread {
 				try {
 					writeToClient("-ERR no such message");
 				} catch (IOException e) {
+					deleteMailsOnException();
 					sTrace.error("Connection aborted by client! Thread" + name);
 				}
 			}
@@ -345,6 +347,7 @@ class POP3ServerThread extends Thread {
 			try {
 				writeToClient("-ERR no argument found");
 			} catch (IOException e) {
+				deleteMailsOnException();
 				sTrace.error("Connection aborted by client! Thread" + name);
 			}
 		}
@@ -361,6 +364,7 @@ class POP3ServerThread extends Thread {
 				try {
 					writeToClient("-ERR no messages");
 				} catch (IOException e) {
+					deleteMailsOnException();
 					sTrace.error("Connection aborted by client! Thread" + name);
 				}
 			} else {
@@ -384,6 +388,7 @@ class POP3ServerThread extends Thread {
 							}
 							writeToClient(".");
 						} catch (IOException e) {
+							deleteMailsOnException();
 							sTrace.error("Connection aborted by client! Thread"
 									+ name);
 						}
@@ -391,6 +396,7 @@ class POP3ServerThread extends Thread {
 						try {
 							writeToClient("-ERR message " + n + " deleted");
 						} catch (IOException e) {
+							deleteMailsOnException();
 							sTrace.error("Connection aborted by client! Thread"
 									+ name);
 						}
@@ -400,6 +406,7 @@ class POP3ServerThread extends Thread {
 					try {
 						writeToClient("-ERR no such message");
 					} catch (IOException e) {
+						deleteMailsOnException();
 						sTrace.error("Connection aborted by client! Thread"
 								+ name);
 					}
@@ -410,6 +417,7 @@ class POP3ServerThread extends Thread {
 			try {
 				writeToClient("-ERR no argument");
 			} catch (IOException e) {
+				deleteMailsOnException();
 				sTrace.error("Connection aborted by client! Thread" + name);
 			}
 		}
@@ -424,6 +432,7 @@ class POP3ServerThread extends Thread {
 			mail = Files.readAllLines(whereItsStored, USED_CHAR_SET);
 			sTrace.debug("Mail " + mail.toString());
 		} catch (IOException e) {
+			deleteMailsOnException();
 			sTrace.error("Could not load Mail " + fileName);
 		}
 		return mail;
@@ -435,6 +444,7 @@ class POP3ServerThread extends Thread {
 		try {
 			writeToClient("+OK " + mailCounter + " " + getAllMailSize());
 		} catch (IOException e) {
+			deleteMailsOnException();
 			sTrace.error("Connection aborted by client! Thread" + name);
 		}
 
@@ -452,6 +462,7 @@ class POP3ServerThread extends Thread {
 			try {
 				writeToClient(response);
 			} catch (IOException e) {
+				deleteMailsOnException();
 				sTrace.error("Connection aborted by client! Thread" + name);
 			}
 		} else {
@@ -471,6 +482,7 @@ class POP3ServerThread extends Thread {
 				// Ende der Mehrzeilennachricht �bertragen.
 				writeToClient(".");
 			} catch (IOException e) {
+				deleteMailsOnException();
 				sTrace.error("Connection aborted by client! Thread" + name);
 			}
 		}
@@ -590,5 +602,28 @@ class POP3ServerThread extends Thread {
 			}
 		}
 		return -1;
+	}
+	
+	private void deleteMails(){
+		for (Integer n : deletedMails) {
+			// Hole den Namen der Datei
+			String fileName = mails.get(n);
+			// Namens String in File Objekt, das auf die Datei im Mail
+			// Ordner
+			// referenziert, umwandeln
+			File mailFile = Paths.get(
+					Proxy.MAIL_STORAGE_PATH + "/" + fileName).toFile();
+			// Versucht die Mail zu l�schen
+			sTrace.debug("loesche Datei " + mailFile.getAbsolutePath());
+			if (!mailFile.delete()) {
+				mailFile.deleteOnExit();
+			}
+		}
+	}
+	
+	private void deleteMailsOnException(){
+		if(deleteOnException){
+			deleteMails();
+		}
 	}
 }
